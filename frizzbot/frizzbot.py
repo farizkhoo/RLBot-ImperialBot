@@ -1,5 +1,6 @@
 import math
 import time
+import numpy as np
 
 from rlbot.agents.base_agent import BaseAgent, SimpleControllerState
 from rlbot.utils.structures.game_data_struct import GameTickPacket
@@ -18,6 +19,7 @@ class obj:
         self.velocity = Vector3([0,0,0])
         self.rotation = Vector3([0,0,0])
         self.rvelocity = Vector3([0,0,0])
+        self.team = 0
 
         self.local_location = Vector3([0,0,0])
 
@@ -27,6 +29,8 @@ class exampleATBA:
     def execute(self,agent):
         target_location = agent.ball
         target_speed = velocity2D(agent.ball) + (distance2D(agent.ball,agent.me)/1.5)
+        angle = shooting_angle2D(agent.ball, agent.human)
+        print(angle)
 
         return agent.exampleController(target_location, target_speed)
 
@@ -34,7 +38,10 @@ class shooting_one:
     def __init__(self):
         self.expired = False
     def execute(self,agent):
-        a
+        target_location = agent.ball
+        angle = shooting_angle2D(agent.ball,agent.human)
+
+        return agent.shootingController(target_location, taget_speed)
 
 class FrizzBot(BaseAgent):
     def initialize_agent(self):
@@ -59,6 +66,7 @@ class FrizzBot(BaseAgent):
         self.me.rvelocity.data = [packet.game_cars[self.index].physics.angular_velocity.x, packet.game_cars[self.index].physics.angular_velocity.y, packet.game_cars[self.index].physics.angular_velocity.z]
         self.me.matrix = rotator_to_matrix(self.me)
         self.me.boost = packet.game_cars[self.index].boost
+        self.me.team = packet.game_cars[self.index].team
 
         self.human.location.data = [packet.game_cars[0].physics.location.x, packet.game_cars[0].physics.location.y, packet.game_cars[0].physics.location.z]
         self.human.velocity.data = [packet.game_cars[0].physics.velocity.x, packet.game_cars[0].physics.velocity.y, packet.game_cars[0].physics.velocity.z]
@@ -66,6 +74,8 @@ class FrizzBot(BaseAgent):
         self.human.rvelocity.data = [packet.game_cars[0].physics.angular_velocity.x, packet.game_cars[0].physics.angular_velocity.y, packet.game_cars[0].physics.angular_velocity.z]
         self.human.matrix = rotator_to_matrix(self.human)
         self.human.boost = packet.game_cars[0].boost
+        self.human.team = packet.game_cars[0].team
+
         
         self.ball.location.data = [packet.game_ball.physics.location.x, packet.game_ball.physics.location.y, packet.game_ball.physics.location.z]
         self.ball.velocity.data = [packet.game_ball.physics.velocity.x, packet.game_ball.physics.velocity.y, packet.game_ball.physics.velocity.z]
@@ -151,3 +161,48 @@ def distance2D(target_object, our_object):
     else:
         difference = target_object.location - our_object.location
     return math.sqrt(difference.data[0]**2 + difference.data[1]**2)
+
+def shooting_angle2D(target_object, our_object):
+    if our_object.team == 0: #blue team
+        goal_loc_bl = Vector3([-892.755, 5120, 0])
+        goal_loc_tl = Vector3([-892.755, 5120, 642.775])
+        goal_loc_br = Vector3([892.755, 5120, 0])
+        goal_loc_tr = Vector3([892.755, 5120, 642.775])
+        goal_loc_c = Vector3([0, 5120, 321])
+    else:
+        goal_loc_bl = Vector3([-892.755, -5120, 0])
+        goal_loc_tl = Vector3([-892.755, -5120, 642.775])
+        goal_loc_br = Vector3([892.755, -5120, 0])
+        goal_loc_tr = Vector3([892.755, -5120, 642.775])
+        goal_loc_c = Vector3([0, -5120, 321])
+    
+    carball_vector3 = target_object.location - our_object.location
+    carball_varray = v3_to_array(carball_vector3)
+    ballgoal_vector3_c = goal_loc_c - target_object.location
+    ballgoal_varray = v3_to_array(ballgoal_vector3_c)
+
+    return angle_between(carball_varray, ballgoal_varray)
+
+def v3_to_array(vector3):
+    array = [vector3.data[0], vector3.data[1], vector3.data[2]]
+
+    return array
+
+def unit_vector(vector):
+    """ Returns the unit vector of the vector.  """
+    return vector / np.linalg.norm(vector)
+
+def angle_between(v1, v2):
+    """ Returns the angle in radians between vectors 'v1' and 'v2'::
+
+            >>> angle_between((1, 0, 0), (0, 1, 0))
+            1.5707963267948966
+            >>> angle_between((1, 0, 0), (1, 0, 0))
+            0.0
+            >>> angle_between((1, 0, 0), (-1, 0, 0))
+            3.141592653589793
+    """
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
